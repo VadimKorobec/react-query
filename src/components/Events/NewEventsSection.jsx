@@ -12,8 +12,6 @@ export default function NewEventsSection() {
     queryFn: fetchEvents,
   });
 
-  console.log(data, isPending, isError, error);
-
   let content;
 
   if (isPending) {
