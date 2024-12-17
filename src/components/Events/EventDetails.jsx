@@ -1,17 +1,50 @@
-import { Link, Outlet, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Link, Outlet, useNavigate, useParams } from "react-router-dom";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import Header from "../Header.jsx";
-import { fetchEvent } from "../../util/http.js";
+import { deleteEvent, fetchEvent, queryClient } from "../../util/http.js";
 import ErrorBlock from "../UI/ErrorBlock.jsx";
+import Modal from "../UI/Modal.jsx";
 
 export default function EventDetails() {
+  const [isDeliting, setIsDeliting] = useState(false);
+
   const params = useParams();
+  const navigate = useNavigate();
 
   const { data, isPending, isError, error } = useQuery({
     queryKey: ["events", params.id],
     queryFn: ({ signal }) => fetchEvent({ id: params.id, signal }),
   });
+
+  const {
+    mutate,
+    isPending: isPendingDelition,
+    isError: isErrorDeleting,
+    error: deleteError,
+  } = useMutation({
+    mutationFn: deleteEvent,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["events"],
+        refetchType: "none",
+      });
+      navigate("/events");
+    },
+  });
+
+  function handleStartDelete() {
+    setIsDeliting(true);
+  }
+
+  function handleStopDelete() {
+    setIsDeliting(false);
+  }
+
+  function handleDelete() {
+    mutate({ id: params.id });
+  }
 
   let content;
 
@@ -38,17 +71,17 @@ export default function EventDetails() {
   }
 
   if (data) {
-    const formattedDate = new Date(data.date).toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
-      year:'numeric',
-    })
+    const formattedDate = new Date(data.date).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
     content = (
       <>
         <header>
           <h1>{data.title}</h1>
           <nav>
-            <button>Delete</button>
+            <button onClick={handleStartDelete}>Delete</button>
             <Link to="edit">Edit</Link>
           </nav>
         </header>
@@ -70,6 +103,34 @@ export default function EventDetails() {
 
   return (
     <>
+      {isDeliting && (
+        <Modal onClose={handleStopDelete}>
+          <h2>Are you sure?</h2>
+          <p>Do you want to delete the event?</p>
+          <div className="form-actions">
+            {isPendingDelition && <p>Deliting, please wait...</p>}
+            {!isPendingDelition && (
+              <>
+                <button className="button-text" onClick={handleStopDelete}>
+                  Cancel
+                </button>
+                <button className="button" onClick={handleDelete}>
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+          {isErrorDeleting && (
+            <ErrorBlock
+              title="Failed to delete event"
+              message={
+                deleteError.info?.message ||
+                "Failed to delete the event. Please try again later. "
+              }
+            />
+          )}
+        </Modal>
+      )}
       <Outlet />
       <Header>
         <Link to="/events" className="nav-item">
